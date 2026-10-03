@@ -1,5 +1,7 @@
 # Phase 2 hand-off: where the work stopped
 
+The full list of remaining phases (2 to 8) is in `docs/BUILD-PLAN-REMAINING.md`.
+
 This branch holds Phase 2 ("Brain") **as written but not finished**. The code exists and
 passes lint. The 106 tests from Phases 0 and 1 still pass. The Phase 2 code itself has
 **no tests yet**, so treat it as unverified.
