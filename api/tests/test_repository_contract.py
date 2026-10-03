@@ -165,6 +165,133 @@ def test_a_repeated_chunk_index_is_rejected(repo):
     assert repo.count_articles() == 0
 
 
+# ---------- vector and keyword search ----------
+
+
+def test_search_vector_returns_closest_chunk_first(repo):
+    save(repo, slug="a", chunks=[chunk(0, seed=0.1)])
+    save(repo, slug="b", chunks=[chunk(0, seed=0.5)])
+    # Query with a vector close to seed=0.5
+    query = vector(0.5)
+    hits = repo.search_vector(query, limit=2)
+    assert len(hits) == 2
+    assert hits[0].similarity >= hits[1].similarity
+
+
+def test_search_vector_respects_limit(repo):
+    for i in range(5):
+        save(repo, slug=f"art-{i}", chunks=[chunk(0, seed=i * 0.1)])
+    hits = repo.search_vector(vector(0.3), limit=2)
+    assert len(hits) <= 2
+
+
+def test_search_vector_empty_repo_returns_empty_list(repo):
+    assert repo.search_vector(vector(0.1), limit=8) == []
+
+
+def test_search_keyword_finds_matching_chunk(repo):
+    save(repo, slug="invoices", chunks=[chunk(0, text="monthly invoice export csv billing")])
+    save(repo, slug="passwords", chunks=[chunk(0, text="reset password settings account")])
+    query_embedding = vector(0.1)
+    hits = repo.search_keyword("invoice billing", query_embedding, limit=8)
+    slugs = [h.article_slug for h in hits]
+    assert "invoices" in slugs
+
+
+def test_search_keyword_returns_empty_for_stopwords_only(repo):
+    save(repo, slug="art", chunks=[chunk(0, text="how the system works")])
+    hits = repo.search_keyword("the how", vector(0.1), limit=8)
+    # "the" and "how" are stopwords; zero useful words means no hits.
+    assert hits == []
+
+
+def test_search_vector_rejects_wrong_dimension(repo):
+    with pytest.raises(ValueError, match="EMBEDDING_DIM"):
+        repo.search_vector([0.1, 0.2], limit=5)  # DIM is 16, not 2
+
+
+# ---------- conversations and messages ----------
+
+
+def test_create_conversation_returns_a_record_with_an_id(repo):
+    conv = repo.create_conversation()
+    assert conv.id
+    assert conv.session_token
+
+
+def test_get_conversation_finds_an_existing_conversation(repo):
+    conv = repo.create_conversation()
+    assert repo.get_conversation(conv.id) == conv
+
+
+def test_get_conversation_returns_none_for_unknown_id(repo):
+    assert repo.get_conversation("00000000-0000-0000-0000-000000000000") is None
+
+
+def test_get_conversation_returns_none_for_garbage_id(repo):
+    assert repo.get_conversation("not-a-uuid") is None
+
+
+def test_add_message_stores_and_retrieves_content(repo):
+    conv = repo.create_conversation()
+    msg = repo.add_message(conv.id, "user", "hello world")
+    assert msg.id
+    assert msg.role == "user"
+    assert msg.content == "hello world"
+
+
+def test_list_messages_returns_messages_in_insertion_order(repo):
+    conv = repo.create_conversation()
+    repo.add_message(conv.id, "user", "first")
+    repo.add_message(conv.id, "assistant", "second")
+    repo.add_message(conv.id, "user", "third")
+    messages = repo.list_messages(conv.id)
+    assert [m.content for m in messages] == ["first", "second", "third"]
+
+
+def test_list_messages_limit_returns_only_the_most_recent(repo):
+    conv = repo.create_conversation()
+    for i in range(5):
+        repo.add_message(conv.id, "user", f"msg {i}")
+    last_two = repo.list_messages(conv.id, limit=2)
+    assert len(last_two) == 2
+    assert last_two[0].content == "msg 3"
+    assert last_two[1].content == "msg 4"
+
+
+def test_list_messages_unknown_conversation_returns_empty_list(repo):
+    assert repo.list_messages("00000000-0000-0000-0000-000000000000") == []
+
+
+def test_add_message_rejects_invalid_role(repo):
+    conv = repo.create_conversation()
+    with pytest.raises(ValueError, match="role"):
+        repo.add_message(conv.id, "moderator", "hi")
+
+
+def test_add_message_stores_optional_metadata(repo):
+    conv = repo.create_conversation()
+    msg = repo.add_message(
+        conv.id,
+        "assistant",
+        "Here is the answer.",
+        citations=[{"article_id": 1, "title": "Help", "url": "https://x", "chunk_id": 2, "quote": "text"}],
+        abstained=False,
+        retrieved_chunk_ids=[2, 3],
+        latency_ms=123,
+        input_tokens=50,
+        output_tokens=20,
+        model="fake-llm",
+    )
+    assert msg.latency_ms == 123
+    assert msg.input_tokens == 50
+    assert msg.output_tokens == 20
+    assert msg.model == "fake-llm"
+    assert msg.retrieved_chunk_ids == [2, 3]
+    assert msg.abstained is False
+    assert msg.citations is not None and len(msg.citations) == 1
+
+
 # ---------- Postgres-only checks (need a real database) ----------
 
 

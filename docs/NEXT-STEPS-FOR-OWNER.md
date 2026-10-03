@@ -33,6 +33,42 @@ You need Docker Desktop running for this.
    `docs/KB-COVERAGE.md` and check both lists exist.
 8. Optional: look at the rows. `docker compose exec db psql -U support -d support_agent -c "select slug from articles limit 5;"`
 
+## Check Phase 2: the AI brain (15 minutes with a Cloudflare account)
+
+You need the Phase 1 local database running and the fake articles ingested first.
+
+1. Follow "Cloudflare account and token" below to get `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+2. Add them to your `.env` file:
+   ```
+   CLOUDFLARE_ACCOUNT_ID=your-account-id
+   CLOUDFLARE_API_TOKEN=your-token
+   LLM_PROVIDER=cloudflare
+   LLM_MODEL=@cf/mistral/mistral-7b-instruct-v0.1
+   EMBEDDING_MODEL=@cf/baai/bge-base-en-v1.5
+   EMBEDDING_DIM=768
+   ```
+3. Re-ingest the demo articles so they get real embeddings:
+   `python -m app.rag.ingest ../data/demo_kb`
+4. Ask the bot a question:
+   `python -m app.cli ask --demo "how do I reset my password?"`
+   You should see a short cited answer, not the fallback message.
+5. Ask something not in the articles:
+   `python -m app.cli ask --demo "what is the capital of France?"`
+   You should see: "I could not find that in our help articles…"
+
+## Cloudflare account and token (free, about 20 minutes)
+
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) and sign up for a free account.
+2. After logging in, look at the URL: `dash.cloudflare.com/<your-account-id>`. Copy that id —
+   it is about 32 characters. This is `CLOUDFLARE_ACCOUNT_ID`.
+3. In the left sidebar click **AI** to confirm Workers AI is available on your account.
+4. Click your account name (top right) → **Profile** → **API Tokens** → **Create Token**.
+5. Choose **Create Custom Token**. Give it a name like "SaaS Chatbot".
+6. Under "Permissions" add: **Account** → **Workers AI** → **Edit**.
+7. Click **Continue to summary** → **Create Token**.
+8. Copy the token immediately (it is only shown once). This is `CLOUDFLARE_API_TOKEN`.
+9. Paste both into your `.env` file as shown in the Phase 2 check above.
+
 ## Accounts you will need later (do these when you want to run with real AI, about 1 to 2 hours)
 
 | Account | Needed from | Where it goes |
