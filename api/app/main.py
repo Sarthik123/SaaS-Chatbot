@@ -13,7 +13,7 @@ from app.providers import (
     build_embedding_provider,
     build_llm_provider,
 )
-from app.routes import chat, health
+from app.routes import admin, chat, feedback, handoff, health
 from app.security import RateLimiter
 
 
@@ -55,6 +55,9 @@ def create_app(
 
     app.include_router(health.router)
     app.include_router(chat.router)
+    app.include_router(feedback.router)
+    app.include_router(handoff.router)
+    app.include_router(admin.router)
     return app
 
 

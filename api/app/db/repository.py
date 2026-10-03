@@ -14,6 +14,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,26 @@ class ChunkHit:
     similarity: float
     # Keyword-match strength (0.0 for a hit that came from the meaning search).
     keyword_score: float = 0.0
+
+
+@dataclass(frozen=True)
+class FeedbackRecord:
+    id: int
+    message_id: str
+    rating: str  # 'up' or 'down'
+    comment: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class HandoffTicketRecord:
+    id: int
+    conversation_id: str | None
+    name: str
+    email: str
+    message: str
+    status: str  # 'open' or 'closed'
+    created_at: datetime
 
 
 @dataclass(frozen=True)
@@ -212,3 +233,47 @@ class Repository(ABC):
     @abstractmethod
     def list_messages(self, conversation_id: str, limit: int | None = None) -> list[MessageRecord]:
         """Messages oldest first. With `limit`, only the most recent `limit` messages."""
+
+    # ----- feedback -----
+
+    @abstractmethod
+    def add_feedback(self, message_id: str, rating: str, comment: str | None = None) -> FeedbackRecord:
+        """Record a thumbs-up or thumbs-down on a message. Raises ValueError for unknown message_id."""
+
+    # ----- handoff tickets -----
+
+    @abstractmethod
+    def create_ticket(
+        self,
+        conversation_id: str | None,
+        name: str,
+        email: str,
+        message: str,
+    ) -> HandoffTicketRecord:
+        """Create a 'talk to a human' request. Returns the new ticket."""
+
+    @abstractmethod
+    def list_tickets(self, status: str | None = None) -> list[HandoffTicketRecord]:
+        """All tickets, newest first. Filter by status ('open' or 'closed') when given."""
+
+    # ----- admin queries -----
+
+    @abstractmethod
+    def list_conversations(self, limit: int = 50) -> list[ConversationRecord]:
+        """The most recent `limit` conversations, newest first."""
+
+    @abstractmethod
+    def list_unanswered(self, limit: int = 50) -> list[MessageRecord]:
+        """The most recent `limit` assistant messages where abstained=True, newest first."""
+
+    @abstractmethod
+    def get_stats(self) -> dict[str, Any]:
+        """Aggregate numbers for the admin stats page.
+
+        Returns a dict with:
+          total_conversations, total_messages, abstain_rate (0-1),
+          thumbs_up, thumbs_down, thumbs_ratio (up/(up+down) or None),
+          p50_latency_ms, p95_latency_ms (or None when no data),
+          avg_input_tokens, avg_output_tokens (or None),
+          total_open_tickets.
+        """

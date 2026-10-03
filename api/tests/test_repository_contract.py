@@ -20,6 +20,8 @@ from app.db.repository import NewChunk
 from app.db.session import make_engine
 from tests.conftest import REAL_DATABASE_URL
 
+# (feedback, tickets and stats contract tests are later in this file)
+
 DIM = 16
 API_DIR = Path(__file__).resolve().parents[1]
 
@@ -290,6 +292,121 @@ def test_add_message_stores_optional_metadata(repo):
     assert msg.retrieved_chunk_ids == [2, 3]
     assert msg.abstained is False
     assert msg.citations is not None and len(msg.citations) == 1
+
+
+# ---------- feedback ----------
+
+
+def test_add_feedback_returns_a_record(repo):
+    conv = repo.create_conversation()
+    msg = repo.add_message(conv.id, "assistant", "answer")
+    fb = repo.add_feedback(msg.id, "up")
+    assert fb.id > 0
+    assert fb.rating == "up"
+    assert fb.message_id == msg.id
+
+
+def test_add_feedback_down_with_comment(repo):
+    conv = repo.create_conversation()
+    msg = repo.add_message(conv.id, "assistant", "answer")
+    fb = repo.add_feedback(msg.id, "down", comment="not helpful")
+    assert fb.rating == "down"
+    assert fb.comment == "not helpful"
+
+
+def test_add_feedback_rejects_unknown_message(repo):
+    with pytest.raises(ValueError):
+        repo.add_feedback("00000000-0000-0000-0000-000000000000", "up")
+
+
+def test_add_feedback_rejects_invalid_rating(repo):
+    conv = repo.create_conversation()
+    msg = repo.add_message(conv.id, "assistant", "answer")
+    with pytest.raises(ValueError, match="rating"):
+        repo.add_feedback(msg.id, "meh")
+
+
+# ---------- handoff tickets ----------
+
+
+def test_create_ticket_returns_a_record(repo):
+    ticket = repo.create_ticket(None, "Alice", "alice@example.com", "I need help.")
+    assert ticket.id > 0
+    assert ticket.status == "open"
+    assert ticket.name == "Alice"
+
+
+def test_list_tickets_newest_first(repo):
+    import time
+    repo.create_ticket(None, "A", "a@x.com", "first")
+    time.sleep(0.01)
+    repo.create_ticket(None, "B", "b@x.com", "second")
+    tickets = repo.list_tickets()
+    assert tickets[0].name == "B"
+    assert tickets[1].name == "A"
+
+
+def test_list_tickets_filtered_by_status(repo):
+    repo.create_ticket(None, "A", "a@x.com", "msg")
+    tickets_open = repo.list_tickets(status="open")
+    tickets_closed = repo.list_tickets(status="closed")
+    assert len(tickets_open) == 1
+    assert len(tickets_closed) == 0
+
+
+def test_list_tickets_all_when_no_filter(repo):
+    repo.create_ticket(None, "A", "a@x.com", "msg")
+    repo.create_ticket(None, "B", "b@x.com", "msg")
+    assert len(repo.list_tickets()) == 2
+
+
+# ---------- admin queries ----------
+
+
+def test_list_conversations_newest_first(repo):
+    import time
+    repo.create_conversation()
+    time.sleep(0.01)
+    second = repo.create_conversation()
+    convs = repo.list_conversations(limit=10)
+    assert convs[0].id == second.id
+
+
+def test_list_unanswered_returns_abstained_assistant_messages(repo):
+    conv = repo.create_conversation()
+    repo.add_message(conv.id, "user", "question")
+    repo.add_message(conv.id, "assistant", "fallback", abstained=True)
+    unanswered = repo.list_unanswered(limit=10)
+    assert len(unanswered) == 1
+    assert unanswered[0].abstained is True
+
+
+def test_list_unanswered_excludes_non_abstained(repo):
+    conv = repo.create_conversation()
+    repo.add_message(conv.id, "user", "question")
+    repo.add_message(conv.id, "assistant", "answer", abstained=False)
+    assert repo.list_unanswered(limit=10) == []
+
+
+def test_get_stats_returns_zeros_for_empty_repo(repo):
+    stats = repo.get_stats()
+    assert stats["total_conversations"] == 0
+    assert stats["total_messages"] == 0
+    assert stats["abstain_rate"] == 0.0
+    assert stats["thumbs_up"] == 0
+    assert stats["total_open_tickets"] == 0
+
+
+def test_get_stats_counts_correctly(repo):
+    conv = repo.create_conversation()
+    repo.add_message(conv.id, "user", "q1")
+    msg = repo.add_message(conv.id, "assistant", "a1", abstained=False, latency_ms=200)
+    repo.add_feedback(msg.id, "up")
+    stats = repo.get_stats()
+    assert stats["total_conversations"] == 1
+    assert stats["total_messages"] == 2
+    assert stats["thumbs_up"] == 1
+    assert stats["thumbs_ratio"] == 1.0
 
 
 # ---------- Postgres-only checks (need a real database) ----------
