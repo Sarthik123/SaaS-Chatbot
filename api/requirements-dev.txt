@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8,<9
+ruff>=0.6
+# Used by FastAPI's TestClient (Starlette now recommends httpx2 over httpx for this).
+httpx2>=2,<3

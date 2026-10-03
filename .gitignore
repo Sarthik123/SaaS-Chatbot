@@ -1,0 +1,30 @@
+# Secrets: the real .env never goes to GitHub. Only .env.example (names, no values) does.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node / Next.js (web/ has its own .gitignore too; these are a safety net)
+node_modules/
+.next/
+out/
+web/test-results/
+web/playwright-report/
+
+# Local data and editor noise
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# Eval output that is only a local scratch copy (the saved reports in evals/results/ ARE committed)
+evals/results/.scratch/
