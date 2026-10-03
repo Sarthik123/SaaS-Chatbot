@@ -13,18 +13,28 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 
-class ProviderNotConfiguredError(RuntimeError):
-    """Raised when a real AI provider is used but is missing settings or not built yet."""
+class ProviderError(RuntimeError):
+    """Something went wrong talking to an AI provider. The message never contains a secret."""
+
+
+class ProviderNotConfiguredError(ProviderError):
+    """A real AI provider is used but a setting (key, account, model) is missing."""
+
+
+class ProviderUnavailableError(ProviderError):
+    """The provider did not answer in time, is rate-limiting us, or is down (we retried once)."""
+
+
+class ProviderResponseError(ProviderError):
+    """The provider answered, but with an error or with something we cannot use."""
 
 
 def not_configured_message(label: str, missing: list[str]) -> str:
     """A clear, secret-free message that says exactly what to fix."""
-    if missing:
-        return (
-            f"{label} is not configured. Set these in your .env file: "
-            f"{', '.join(missing)}. (See .env.example.)"
-        )
-    return f"{label} is a placeholder until Phase 2, when the real connection is built."
+    return (
+        f"{label} is not configured. Set these in your .env file: "
+        f"{', '.join(missing)}. (See .env.example.)"
+    )
 
 
 @dataclass(frozen=True)

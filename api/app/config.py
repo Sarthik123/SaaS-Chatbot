@@ -40,13 +40,35 @@ class Settings(BaseSettings):
     cloudflare_account_id: str = ""
     # Which AI provider to use. "fake" is for tests: no internet, no cost.
     llm_provider: Literal["cloudflare", "openai", "fake"] = "cloudflare"
+    # Empty model names mean "use the provider's default" (see docs/DECISIONS.md D20/D21).
+    # For OpenAI there is no default: set both names yourself.
     llm_model: str = ""
     embedding_model: str = ""
-    # Size of an embedding vector. 384 is only a placeholder until Phase 2, when the
-    # real embedding model is chosen and this must match that model's real size.
-    embedding_dim: int = 384
+    # Size of an embedding vector. It MUST match the embedding model. 768 matches the default
+    # Cloudflare model (@cf/baai/bge-base-en-v1.5). If you change the model, change this too and
+    # recreate the database tables (the size is fixed when the migration runs).
+    embedding_dim: int = 768
     # Browser addresses allowed to call the API, separated by commas.
     allowed_origins: str = "http://localhost:3000"
+
+    # --- How the bot decides (AGENTS.md "RAG rules").
+    # Tune these with the eval set, not by guessing.
+    # A chunk must be at least this similar (cosine, 0 to 1) to the question to be used. If no
+    # chunk passes, the bot says "I don't know" WITHOUT calling the AI model.
+    min_similarity: float = 0.35
+    # The most words-pieces ("tokens") the AI model may write in one answer.
+    max_output_tokens: int = 400
+
+    # --- Limits and safety.
+    # Messages allowed per visitor (per IP address) in each time window.
+    rate_limit_messages: int = 20
+    rate_limit_window_seconds: int = 600
+    # Behind a proxy such as Render the real visitor address is in the X-Forwarded-For header.
+    # Only turn this on when the API really is behind a proxy you trust; otherwise anyone could
+    # fake the header and dodge the rate limit.
+    trust_proxy_headers: bool = False
+    # Seconds to wait for the AI provider before giving up.
+    provider_timeout_seconds: float = 30.0
 
     @property
     def allowed_origins_list(self) -> list[str]:

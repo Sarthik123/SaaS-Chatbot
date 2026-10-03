@@ -11,7 +11,8 @@ def load(**overrides) -> Settings:
 def test_defaults_when_nothing_is_set():
     settings = load()
     assert settings.llm_provider == "cloudflare"
-    assert settings.embedding_dim == 384
+    assert settings.embedding_dim == 768
+    assert settings.min_similarity == 0.35
     assert settings.allowed_origins_list == ["http://localhost:3000"]
     assert settings.admin_password.get_secret_value() == ""  # admin area disabled by default
 
@@ -31,7 +32,7 @@ def test_empty_values_fall_back_to_defaults(monkeypatch):
     monkeypatch.setenv("EMBEDDING_DIM", "")
     monkeypatch.setenv("LLM_PROVIDER", "")
     settings = load()
-    assert settings.embedding_dim == 384
+    assert settings.embedding_dim == 768
     assert settings.llm_provider == "cloudflare"
 
 
@@ -39,7 +40,7 @@ def test_empty_values_in_an_env_file_also_fall_back(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("EMBEDDING_DIM=\nLLM_MODEL=my-model\n")
     settings = Settings(_env_file=env_file)
-    assert settings.embedding_dim == 384
+    assert settings.embedding_dim == 768
     assert settings.llm_model == "my-model"
 
 
