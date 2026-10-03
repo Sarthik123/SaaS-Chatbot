@@ -79,6 +79,93 @@ You need the Phase 1 local database running and the fake articles ingested first
 
 Exact click-by-click steps for each are added to this file in the phase that needs them.
 
+## Phase 7: Deploy to the internet (1–2 hours the first time)
+
+You need four free accounts: **Neon** (database), **Cloudflare** (AI models), **Render** (API server), **Vercel** (website). Steps are in this order because each one's output is needed by the next.
+
+### A. Create the database on Neon (10 minutes)
+
+1. Go to [neon.tech](https://neon.tech) and sign up for a free account.
+2. Click **New project**. Name it `saas-chatbot`. Leave the region as the default.
+3. On the project dashboard, find the **Connection string** box. Click **Copy**.
+   It looks like: `postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`
+   This is your `DATABASE_URL`. Save it somewhere safe — you will need it in steps B and C.
+4. In the Neon dashboard, click **SQL editor** and run this one command to enable the vector extension:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+5. Click **Run** and confirm you see "Success".
+
+### B. Get Cloudflare Workers AI keys (follow the "Cloudflare account and token" section above)
+
+You should already have `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` from Phase 2.
+If not, follow the "Cloudflare account and token" section above now. Keep them ready.
+
+### C. Deploy the API on Render (20 minutes)
+
+1. Go to [render.com](https://render.com) and sign up with your GitHub account.
+2. Click **New** → **Web Service**.
+3. Connect your GitHub account if prompted, then find and select the `SaaS-Chatbot` repository.
+4. Fill in the settings exactly as follows:
+   - **Name**: `saas-chatbot-api`
+   - **Root directory**: _(leave blank — the Dockerfile path handles this)_
+   - **Runtime**: Docker
+   - **Dockerfile path**: `api/Dockerfile`
+   - **Instance type**: Free
+5. Scroll down to **Environment Variables** and add all of these (click **Add environment variable** for each):
+   ```
+   DATABASE_URL        = (paste the Neon connection string from step A.3)
+   CLOUDFLARE_ACCOUNT_ID = (from step B)
+   CLOUDFLARE_API_TOKEN  = (from step B)
+   LLM_PROVIDER        = cloudflare
+   LLM_MODEL           = @cf/mistral/mistral-7b-instruct-v0.1
+   EMBEDDING_MODEL     = @cf/baai/bge-base-en-v1.5
+   EMBEDDING_DIM       = 768
+   ADMIN_PASSWORD      = (choose any strong password — write it down)
+   SESSION_SECRET      = (type 32 random characters, e.g. use a password manager)
+   ALLOWED_ORIGINS     = https://saas-chatbot.vercel.app
+   ```
+   _(You will update `ALLOWED_ORIGINS` in step D.5 once you know the real Vercel URL.)_
+6. Click **Create Web Service**. Render will build the Docker image (3–5 minutes).
+7. Wait for the deploy log to show `Application startup complete.`
+8. Copy the URL Render gives you — it looks like `https://saas-chatbot-api.onrender.com`. This is your `NEXT_PUBLIC_API_URL`.
+
+### D. Deploy the website on Vercel (10 minutes)
+
+1. Go to [vercel.com](https://vercel.com) and sign up with your GitHub account.
+2. Click **Add New Project** → find `SaaS-Chatbot` → click **Import**.
+3. Vercel will auto-detect Next.js. In the **Root Directory** box type: `web`
+4. Under **Environment Variables** add:
+   ```
+   NEXT_PUBLIC_API_URL = (paste the Render URL from step C.8, e.g. https://saas-chatbot-api.onrender.com)
+   ```
+5. Click **Deploy**. Wait for the green tick (1–3 minutes).
+6. Vercel shows your live URL, e.g. `https://saas-chatbot.vercel.app`.
+7. Go back to the Render dashboard → your service → **Environment** tab. Update `ALLOWED_ORIGINS` to the real Vercel URL. Click **Save Changes** — Render redeploys automatically.
+
+### E. Ingest the demo articles into the live database (5 minutes)
+
+1. Open your Vercel URL and go to `/admin` (e.g. `https://saas-chatbot.vercel.app/admin`).
+2. Log in with the `ADMIN_PASSWORD` you set in step C.5.
+3. Click the **Articles** tab → **Re-embed all** button.
+4. Wait for the confirmation message. The 25 demo articles are now in Neon with real embeddings.
+
+### F. Verify everything works (5 minutes)
+
+1. Go to `https://saas-chatbot.vercel.app/demo` and click the chat bubble.
+2. Ask: "How do I reset my password?" — you should see a cited answer.
+3. Ask: "What is the capital of France?" — you should see the "I don't know" fallback.
+4. Click "Talk to a human", fill in the form, submit.
+5. Go back to `/admin` → **Tickets** tab and confirm the ticket is there.
+6. Check `/admin` → **Stats** tab for counts.
+
+### G. (Optional) Make the repository public
+
+When you want recruiters to read the code: GitHub → repo → **Settings** → scroll to **Danger Zone** → **Change visibility** → **Make public**.
+Do this only after the CI "Secrets check" job passes (it scans every commit for leaked keys).
+
+---
+
 ## Optional: make the repository public
 
 The guide says a public repo is fine because secrets never go into it. When you want recruiters to

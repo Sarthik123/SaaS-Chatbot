@@ -67,3 +67,18 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+
+  secrets:
+    name: Secrets check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so we can scan every commit
+      - name: Scan for leaked secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # gitleaks exits non-zero if it finds a secret. The build fails automatically.
+        # Results appear in the Actions run log and as a GitHub Security alert.
+        continue-on-error: false
