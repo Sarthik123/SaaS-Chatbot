@@ -9,6 +9,7 @@ import json
 import math
 import re
 
+from app.db.textsearch import STOPWORDS
 from app.providers.base import EmbeddingProvider, LLMProvider, LLMResult
 
 _WORD = re.compile(r"[a-z0-9]+")
@@ -20,7 +21,7 @@ class FakeEmbeddingProvider(EmbeddingProvider):
     """Deterministic embeddings built from the words in the text.
 
     Same text -> same vector, always (we use sha256, not Python's randomised hash()).
-    Texts that share words get a higher cosine similarity than texts that do not.
+    Texts that share (non-common) words get a higher cosine similarity than texts that do not.
     """
 
     name = "fake"
@@ -34,7 +35,10 @@ class FakeEmbeddingProvider(EmbeddingProvider):
         return [self._embed_one(text) for text in texts]
 
     def _embed_one(self, text: str) -> list[float]:
-        words = _WORD.findall(text.lower()) or ["<empty>"]  # never produce an all-zero vector
+        all_words = _WORD.findall(text.lower())
+        # Ignore very common words ("how", "do", "the"): real embedding models also give them
+        # little weight. If nothing else is left, keep them so the vector is never all zeros.
+        words = [w for w in all_words if w not in STOPWORDS] or all_words or ["<empty>"]
         vector = [0.0] * self.dim
         for word in words:
             digest = hashlib.sha256(word.encode("utf-8")).digest()
