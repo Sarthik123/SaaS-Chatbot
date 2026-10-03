@@ -10,11 +10,28 @@ permissions:
 
 jobs:
   api:
-    name: API (lint + tests)
+    name: API (lint + tests + database)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: api
+    # A throw-away Postgres with pgvector, so the "integration" tests run for real in CI.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: support
+          POSTGRES_PASSWORD: support
+          POSTGRES_DB: support_agent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U support -d support_agent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://support:support@localhost:5432/support_agent
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,6 +42,14 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: pytest -q
+      # The real commands from the README, with the fake AI provider (no internet, no cost).
+      - name: Migrate the database and ingest the demo articles twice
+        env:
+          LLM_PROVIDER: fake
+        run: |
+          alembic upgrade head
+          python -m app.rag.ingest ../data/demo_kb
+          python -m app.rag.ingest ../data/demo_kb
 
   web:
     name: Web (lint + build)

@@ -26,8 +26,8 @@ The demo company is a made-up invoicing app called "Acme Invoicing". All help ar
 
 | Phase | What | Status |
 |---|---|---|
-| 0 | Foundations: folders, config, health check, fake AI parts, CI | in progress |
-| 1 | Knowledge base: database, 25 fake articles, ingestion | not started |
+| 0 | Foundations: folders, config, health check, fake AI parts, CI | built |
+| 1 | Knowledge base: database, 25 fake articles, ingestion | built |
 | 2 | Brain: search, abstain-first, cited answers | not started |
 | 3 | Chat page, citations, human handoff, thumbs | not started |
 | 4 | Admin area | not started |
@@ -61,7 +61,26 @@ uvicorn app.main:app --reload --port 8000
 cd web && npm install && npm run dev
 ```
 
-Local database (from Phase 1): `docker compose up -d db` starts Postgres 16 with pgvector.
+### Local database and the demo articles (Phase 1)
+
+```bash
+# from the repo root: start Postgres 16 with pgvector
+docker compose up -d db
+
+# in .env set:  DATABASE_URL=postgresql://support:support@localhost:5432/support_agent
+# then, from the api/ folder (virtual environment active):
+cd api
+alembic upgrade head                                  # creates the tables
+LLM_PROVIDER=fake python -m app.rag.ingest ../data/demo_kb   # loads the 25 fake articles
+```
+
+The ingest command prints how many articles and chunks it stored. Run it a second time: the
+numbers must stay the same (no duplicates). `LLM_PROVIDER=fake` uses the free fake embeddings;
+real embeddings arrive in Phase 2. Use the same `EMBEDDING_DIM` for the migration and for ingestion.
+
+Backend tests that need the database (marked `integration`) run when `DATABASE_URL` is set:
+`DATABASE_URL=postgresql://support:support@localhost:5432/support_agent pytest -q`.
+They create and delete their own private schema, so they never touch your real tables.
 
 ## Tests and checks
 
