@@ -63,19 +63,30 @@ def admin_login(body: LoginRequest, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Wrong password.")
     salt = request.app.state.ip_salt
     token = _make_token(real_password, salt)
+    # Cross-origin cookies (Vercel → Render) require samesite="none" + secure=True.
+    # Locally / in tests the request is HTTP so we fall back to samesite="lax".
+    is_https = (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https"
+    )
     response.set_cookie(
         key=_COOKIE,
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite="none" if is_https else "lax",
+        secure=is_https,
         max_age=86400 * 7,  # 7 days
     )
     return {"ok": True}
 
 
 @router.post("/logout")
-def admin_logout(response: Response):
-    response.delete_cookie(_COOKIE)
+def admin_logout(request: Request, response: Response):
+    is_https = (
+        request.url.scheme == "https"
+        or request.headers.get("x-forwarded-proto") == "https"
+    )
+    response.delete_cookie(_COOKIE, samesite="none" if is_https else "lax", secure=is_https)
     return {"ok": True}
 
 
