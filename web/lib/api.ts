@@ -101,6 +101,28 @@ export async function submitHandoff(data: HandoffData): Promise<{ ticket_id: num
 
 // ---------- admin ----------
 
+const ADMIN_TOKEN_KEY = "admin_token";
+
+function getAdminToken(): string | null {
+  try { return localStorage.getItem(ADMIN_TOKEN_KEY); } catch { return null; }
+}
+
+export function saveAdminToken(token: string): void {
+  try { localStorage.setItem(ADMIN_TOKEN_KEY, token); } catch { /* ignore */ }
+}
+
+export function clearAdminToken(): void {
+  try { localStorage.removeItem(ADMIN_TOKEN_KEY); } catch { /* ignore */ }
+}
+
+function adminHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = getAdminToken();
+  return {
+    ...(extra ?? {}),
+    ...(token ? { "X-Admin-Token": token } : {}),
+  };
+}
+
 export async function adminLogin(password: string): Promise<boolean> {
   const response = await fetch(`${API_URL}/api/admin/login`, {
     method: "POST",
@@ -108,13 +130,17 @@ export async function adminLogin(password: string): Promise<boolean> {
     credentials: "include",
     body: JSON.stringify({ password }),
   });
-  return response.ok;
+  if (!response.ok) return false;
+  const data = await response.json() as { ok: boolean; token?: string };
+  if (data.token) saveAdminToken(data.token);
+  return data.ok;
 }
 
 export async function adminFetch(path: string): Promise<unknown> {
   const response = await fetch(`${API_URL}${path}`, {
     credentials: "include",
     cache: "no-store",
+    headers: adminHeaders(),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
@@ -123,7 +149,7 @@ export async function adminFetch(path: string): Promise<unknown> {
 export async function adminPost(path: string, body: unknown): Promise<unknown> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: adminHeaders({ "Content-Type": "application/json" }),
     credentials: "include",
     body: JSON.stringify(body),
   });
@@ -135,6 +161,7 @@ export async function adminDelete(path: string): Promise<boolean> {
   const response = await fetch(`${API_URL}${path}`, {
     method: "DELETE",
     credentials: "include",
+    headers: adminHeaders(),
   });
   return response.ok;
 }

@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { adminDelete, adminFetch, adminLogin, adminPost } from "@/lib/api";
+import { adminDelete, adminFetch, adminLogin, adminPost, clearAdminToken } from "@/lib/api";
 
 // ---------- types ----------
 
@@ -417,7 +417,13 @@ export default function AdminPage() {
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <span className="font-bold text-zinc-900 dark:text-white">Admin</span>
-          <span className="text-sm text-zinc-500">Acme Invoicing Support</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-zinc-500">Acme Invoicing Support</span>
+            <button
+              onClick={() => { clearAdminToken(); setLoggedIn(false); }}
+              className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >Log out</button>
+          </div>
         </div>
       </header>
 

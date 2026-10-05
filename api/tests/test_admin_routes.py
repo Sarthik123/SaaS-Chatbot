@@ -167,7 +167,9 @@ def test_admin_login_succeeds_with_correct_password():
     client, _ = make_client()
     response = _login(client)
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    data = response.json()
+    assert data["ok"] is True
+    assert "token" in data  # token returned so frontend can send it as X-Admin-Token header
 
 
 def test_admin_login_sets_a_cookie():

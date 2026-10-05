@@ -35,15 +35,20 @@ def _make_token(password: str, salt: str) -> str:
 
 
 def _require_admin(request: Request) -> None:
-    """Raise 401 when the request does not carry a valid admin cookie."""
+    """Raise 401 when the request does not carry a valid admin token.
+
+    Accepts the token from either:
+    - The X-Admin-Token header (used by the frontend — reliable cross-origin)
+    - The admin_session cookie (fallback for local dev / tests)
+    """
     _check_admin_enabled(request)
-    cookie = request.cookies.get(_COOKIE, "")
-    if not cookie:
+    token = request.headers.get("x-admin-token") or request.cookies.get(_COOKIE, "")
+    if not token:
         raise HTTPException(status_code=401, detail="Not logged in.")
     password = request.app.state.settings.admin_password.get_secret_value()
     salt = request.app.state.ip_salt
     expected = _make_token(password, salt)
-    if not hmac.compare_digest(cookie, expected):
+    if not hmac.compare_digest(token, expected):
         raise HTTPException(status_code=401, detail="Not logged in.")
 
 
@@ -77,7 +82,9 @@ def admin_login(body: LoginRequest, request: Request, response: Response):
         secure=is_https,
         max_age=86400 * 7,  # 7 days
     )
-    return {"ok": True}
+    # Also return the token in the body so the frontend can store it in localStorage
+    # and send it as X-Admin-Token. This is more reliable than cookies cross-origin.
+    return {"ok": True, "token": token}
 
 
 @router.post("/logout")

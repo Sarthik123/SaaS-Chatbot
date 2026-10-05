@@ -66,7 +66,7 @@ def create_app(
         allow_origins=settings.allowed_origins_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "X-Admin-Token"],
     )
 
     app.include_router(health.router)
