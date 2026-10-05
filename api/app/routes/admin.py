@@ -165,10 +165,8 @@ def load_demo(request: Request):
     import pathlib
     from app.rag.ingest import ingest_text
 
-    demo_dir = pathlib.Path("/demo_kb")
-    if not demo_dir.exists():
-        # Fallback for local dev: look two levels up from the api/ folder.
-        demo_dir = pathlib.Path(__file__).parents[3] / "data" / "demo_kb"
+    # demo_kb/ is bundled inside api/ (copied there so it's always in the Docker build context).
+    demo_dir = pathlib.Path(__file__).parents[2] / "demo_kb"
     if not demo_dir.exists():
         raise HTTPException(status_code=404, detail="Demo KB not found on this server.")
 

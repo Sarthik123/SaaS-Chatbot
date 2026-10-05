@@ -17,6 +17,17 @@ from app.routes import admin, chat, feedback, handoff, health
 from app.security import RateLimiter
 
 
+def _run_migrations(database_url: str) -> None:
+    """Apply any pending Alembic migrations. Safe to call on every startup (idempotent)."""
+    import subprocess, sys, pathlib
+    alembic_ini = pathlib.Path(__file__).parent.parent / "alembic.ini"
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
+        check=True,
+        env={**__import__("os").environ, "DATABASE_URL": database_url},
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -30,6 +41,11 @@ def create_app(
     (a fake repository and fake AI providers), so they need no database and cost nothing.
     """
     settings = settings or get_settings()
+
+    # Run migrations before anything else touches the database.
+    database_url = settings.database_url.get_secret_value()
+    if database_url:
+        _run_migrations(database_url)
 
     app = FastAPI(title="SaaS AI Support Agent API")
     app.state.settings = settings
