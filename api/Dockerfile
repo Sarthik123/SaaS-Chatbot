@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code.
 COPY api/ ./
 
+# Bundle the demo knowledge base so the admin "Load demo articles" button works.
+COPY data/demo_kb/ /demo_kb/
+
 # The PORT variable is set by Render; the default 8000 works locally.
 ENV PORT=8000
 

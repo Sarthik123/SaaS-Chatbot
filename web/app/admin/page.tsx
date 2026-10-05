@@ -106,6 +106,7 @@ function Empty({ text }: { text: string }) {
 function ArticlesTab() {
   const [articles, setArticles] = useState<Article[] | null>(null);
   const [reindexing, setReindexing] = useState(false);
+  const [loadingDemo, setLoadingDemo] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -123,6 +124,19 @@ function ArticlesTab() {
     if (!confirm("Delete this article and all its chunks?")) return;
     await adminDelete(`/api/admin/articles/${id}`);
     void load();
+  }
+
+  async function handleLoadDemo() {
+    setLoadingDemo(true);
+    try {
+      const result = await adminPost("/api/admin/load-demo", {}) as { loaded: number };
+      alert(`Loaded ${result.loaded} demo articles. Now click "Re-embed all" to make them searchable.`);
+      void load();
+    } catch {
+      alert("Failed to load demo articles. Check the Render logs.");
+    } finally {
+      setLoadingDemo(false);
+    }
   }
 
   async function handleReindex() {
@@ -154,7 +168,14 @@ function ArticlesTab() {
     <div className="space-y-8">
       {/* List */}
       <Section title="Articles">
-        <div className="mb-2 flex justify-end">
+        <div className="mb-2 flex justify-end gap-2">
+          <button
+            onClick={handleLoadDemo}
+            disabled={loadingDemo}
+            className="rounded bg-blue-50 px-3 py-1.5 text-sm text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-950 dark:text-blue-300 dark:hover:bg-blue-900"
+          >
+            {loadingDemo ? "Loading…" : "Load demo articles"}
+          </button>
           <button
             onClick={handleReindex}
             disabled={reindexing}

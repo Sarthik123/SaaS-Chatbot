@@ -154,6 +154,37 @@ def reindex(request: Request):
     return {"reindexed": count}
 
 
+@router.post("/load-demo")
+def load_demo(request: Request):
+    """Ingest the bundled demo knowledge base (data/demo_kb/).
+
+    Safe to call multiple times — existing articles are upserted, not duplicated.
+    The demo KB is copied into the Docker image at /demo_kb/.
+    """
+    _require_admin(request)
+    import pathlib
+    from app.rag.ingest import ingest_text
+
+    demo_dir = pathlib.Path("/demo_kb")
+    if not demo_dir.exists():
+        # Fallback for local dev: look two levels up from the api/ folder.
+        demo_dir = pathlib.Path(__file__).parents[3] / "data" / "demo_kb"
+    if not demo_dir.exists():
+        raise HTTPException(status_code=404, detail="Demo KB not found on this server.")
+
+    repo = request.app.state.repository
+    embedder = request.app.state.embedder
+    count = 0
+    for md_file in sorted(demo_dir.glob("*.md")):
+        body = md_file.read_text(encoding="utf-8")
+        lines = body.splitlines()
+        title = lines[0].lstrip("# ").strip() if lines else md_file.stem
+        slug = md_file.stem
+        ingest_text(repo, embedder, slug=slug, body=body, source_url="", title=title)
+        count += 1
+    return {"loaded": count}
+
+
 # ---------- conversations ----------
 
 
